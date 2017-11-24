@@ -16,8 +16,8 @@ from string import ascii_lowercase, digits
 import aiohttp
 import async_timeout
 
-from subdomains import subdomains
-from tlds import tlds
+from static.subdomains import subdomains
+from static.tlds import tlds
 
 SUCCESSFUL_MAPPED_HOSTS = {}
 SUBPROCESS_COUNT = 0
@@ -25,16 +25,31 @@ SUBPROCESS_MAX_COUNT = 50
 WAIT_INTERVALL = 0.1
 WORDLIST_URL = "https://github.com/dwyl/english-words/blob/master/words.txt?raw=true"
 
+ENUMERATOR_QUEUE = []
+
+
+class Mode:
+    HOST_ENUMERATION = 0
+
 
 def possible_hosts(length):
     for host in (''.join(i) for i in product(ascii_lowercase + digits + "-", repeat=length)):
         yield host
 
 
+def handle_connection_error(url):
+    print("{url} could not be retireved".format(url=url))
+    # FIXME: add a mantainer task for deferred retries
+    ENUMERATOR_QUEUE.append(url)
+
+
 async def fetch(session, url, *, loop):
     with async_timeout.timeout(10, loop=loop):
-        async with session.get(url) as response:
-            return await response.text()
+        try:
+            async with session.get(url) as response:
+                return await response.text()
+        except aiohttp.client_exceptions.ClientConnectorError:
+            handle_connection_error(url)
 
 
 async def wordlist(loop):
@@ -52,7 +67,7 @@ async def print_current_map():
     print(SUCCESSFUL_MAPPED_HOSTS)
 
 
-async def start(*, loop):
+async def _enumerate_hosts(*, loop):
     for subdomain in subdomains:
         for tld in tlds:
             for host in await wordlist(loop):
@@ -136,16 +151,25 @@ async def can_be_taken_over(host, *, loop):
         stdin=None,
         stderr=None,
     )
-
+    transport = None
     try:
         transport, protocol = await proc
         await cmd_done
     finally:
-        transport.close()
+        if transport is not None:
+            transport.close()
 
     SUBPROCESS_COUNT -= 1
     return cmd_done.result()
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(start(loop=loop))
+def run(args, mode):
+    if mode == Mode.HOST_ENUMERATION:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(_enumerate_hosts(loop=loop))
+
+# TODO:
+# Replace all calls to print with logger calls (use swag)
+#
+#
+#
