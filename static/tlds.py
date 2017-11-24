@@ -1,4 +1,4 @@
-from utils import split_iter
+from iterators.utils import split_iter
 
 tlds=split_iter("""aaa
 aarp
