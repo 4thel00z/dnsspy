@@ -50,6 +50,26 @@ class MessageLoopException(BaseException):
 class MessageLoop(threading.Thread):
     """
     The message loop is a high level component that handles asynchronous messages on a separate thread.
+    It can be used in this fashion:
+    handler, *args, self, callback
+
+    def my_callback(*args):
+        print("was geht")
+
+
+    def handler_with_callback(a, b, message_loop=None, callback=None):
+        callback()
+
+
+    handle_messages = message_loop.register_post_callback_listener(my_callback)
+
+    message_loop.start()
+
+    handle_messages(handler_with_callback, "paff", "paff")
+
+    # potentially other messages
+
+    message_loop.shutdown()
     """
 
     def __init__(self, loop: asyncio.AbstractEventLoop, debug: bool = False) -> None:
@@ -130,18 +150,4 @@ loop = event_loop
 message_loop = MessageLoop(loop=loop)
 
 
-# handler, *args, self, callback
-def my_callback(*args):
-    print("was geht")
 
-
-def handler_with_callback(a, b, message_loop=None, callback=None):
-    callback()
-
-
-handle_messages = message_loop.register_post_callback_listener(my_callback)
-
-message_loop.start()
-
-handle_messages(handler_with_callback, "paff", "paff")
-message_loop.shutdown()
